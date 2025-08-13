@@ -8,7 +8,6 @@ data "aws_ami" "al2023" {
   }
 }
 
-# 보안그룹: 22(SSH), 3000(Nest) 오픈
 resource "aws_security_group" "app" {
   name        = "darapo-${var.env}-app-sg"
   description = "App SG"
@@ -20,6 +19,24 @@ resource "aws_security_group" "app" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [var.ssh_ingress_cidr]
+  }
+
+  # HTTP 추가 (Let's Encrypt 인증용)
+  ingress {
+    description = "HTTP for Lets Encrypt"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # HTTPS 추가 (프로덕션 트래픽)
+  ingress {
+    description = "HTTPS for production"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
@@ -37,7 +54,6 @@ resource "aws_security_group" "app" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
-
 # EC2 인스턴스 (퍼블릭 서브넷)
 resource "aws_instance" "app" {
   ami                         = data.aws_ami.al2023.id
