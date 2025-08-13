@@ -1,0 +1,6 @@
+# 깃 무시 파일
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+
