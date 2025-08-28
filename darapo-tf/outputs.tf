@@ -1,23 +1,37 @@
-output "vpc_id" {
-  value = module.vpc.vpc_id
-}
-
-output "public_subnets" {
-  value = module.vpc.public_subnets
-}
-
-output "private_subnets" {
-  value = module.vpc.private_subnets
-}
-
+# EC2 Instance 정보
 output "instance_id" {
-  value = aws_instance.app.id
+  description = "EC2 Instance ID"
+  value       = aws_instance.app.id
 }
 
 output "public_ip" {
-  value = aws_instance.app.public_ip
+  description = "EC2 Public IP"
+  value       = aws_instance.app.public_ip
 }
 
-output "test_url" {
-  value = "http://${aws_instance.app.public_ip}:3000/"
+output "application_url" {
+  description = "Application URL"
+  value       = "http://${aws_instance.app.public_ip}/"
+}
+
+# MongoDB 연결 정보
+output "mongodb_connection_string" {
+  description = "MongoDB Atlas Connection String"
+  value       = var.mongodb_connection_string
+  sensitive   = true
+}
+
+# SNS 정보
+output "sns_topic_arn" {
+  description = "SNS Topic ARN for alarms"
+  value       = aws_sns_topic.alarms.arn
+}
+
+# 도메인 정보 (도메인이 설정된 경우에만)
+output "domain_urls" {
+  description = "Domain URLs"
+  value = var.domain_name != "" ? {
+    root = "https://${var.domain_name}/"
+    api  = "https://api.${var.domain_name}/"
+  } : null
 }

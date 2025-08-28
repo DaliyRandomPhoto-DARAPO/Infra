@@ -1,0 +1,122 @@
+# SSM 기반 백엔드 배포 워크플로우
+
+name: Deploy Backend to EC2 (SSM)
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'server/**' ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write  # OIDC 토큰 권한 추가
+
+env:
+  SERVICE_DIR: /home/ec2-user/DARAPO/server
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # AWS 자격 증명 설정 (OIDC)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::YOUR_ACCOUNT_ID:role/GitHubActionsRole
+          aws-region: ap-northeast-2
+
+      # EC2 인스턴스 ID 가져오기
+      - name: Get EC2 Instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=darapo-dev-app" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      # .env 파일 백업
+      - name: Backup .env file
+        run: |
+          aws ssm start-session \
+            --target ${{ steps.get-instance.outputs.instance_id }} \
+            --document-name AWS-StartInteractiveCommand \
+            --parameters command="if [ -f /home/ec2-user/DARAPO/server/.env ]; then cp /home/ec2-user/DARAPO/server/.env /tmp/.env.backup && echo '✅ .env 백업 완료'; fi"
+
+      # server 폴더 압축
+      - name: Create deployment package
+        run: |
+          cd server
+          tar -czf ../server.tar.gz .
+          cd ..
+
+      # S3에 업로드 (임시)
+      - name: Upload to S3
+        run: |
+          aws s3 cp server.tar.gz s3://your-deployment-bucket/server-${{ github.sha }}.tar.gz
+
+      # SSM으로 파일 다운로드 및 배포
+      - name: Deploy via SSM
+        run: |
+          aws ssm start-session \
+            --target ${{ steps.get-instance.outputs.instance_id }} \
+            --document-name AWS-StartInteractiveCommand \
+            --parameters command="
+              cd /home/ec2-user/DARAPO
+
+              # 기존 server 백업
+              if [ -d server ]; then
+                mv server server.backup.$(date +%Y%m%d_%H%M%S)
+              fi
+
+              # 새 파일 다운로드 및 압축 해제
+              aws s3 cp s3://your-deployment-bucket/server-${{ github.sha }}.tar.gz server.tar.gz
+              tar -xzf server.tar.gz
+              mv server-* server
+              rm server.tar.gz
+
+              cd server
+
+              # .env 파일 복원
+              if [ -f /tmp/.env.backup ]; then
+                cp /tmp/.env.backup .env
+                rm /tmp/.env.backup
+                echo '✅ .env 복원 완료'
+              fi
+
+              # 빌드 및 재시작
+              npm ci
+              npm run build
+              pm2 reload ecosystem.config.js
+
+              # 헬스체크
+              sleep 10
+              if curl -f http://localhost:3000/api > /dev/null 2>&1; then
+                echo '✅ 배포 성공!'
+              else
+                echo '⚠️ 헬스체크 실패'
+                pm2 logs --lines 10
+              fi
+            "
+
+      # 임시 파일 정리
+      - name: Cleanup S3
+        run: |
+          aws s3 rm s3://your-deployment-bucket/server-${{ github.sha }}.tar.gz
+
+      # 알림 (옵션)
+      - name: Notify deployment result
+        if: always()
+        run: |
+          # Slack이나 다른 알림 서비스 연동 가능
+          echo "배포 완료: ${{ job.status }}"

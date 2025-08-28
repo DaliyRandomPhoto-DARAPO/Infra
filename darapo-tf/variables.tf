@@ -8,19 +8,31 @@ variable "env" {
   default = "dev"
 }
 
-variable "ssh_key_name" {
-  description = "EC2에 붙일 기존 Key Pair 이름"
-  type        = string
-  default     = "darapo-key"
-}
-
-variable "ssh_ingress_cidr" {
-  description = "SSH 허용 CIDR (내 IP/32 추천)"
-  type        = string
-  default     = "0.0.0.0/0"  # 데모용. 운영에선 꼭 본인 IP로 제한!
-}
-
 variable "instance_type" {
   type    = string
-  default = "t3.medium"
+  default = "t4g.medium"
+}
+
+variable "mongodb_connection_string" {
+  description = "MongoDB Atlas Connection String"
+  type        = string
+  sensitive   = true
+}
+
+variable "notification_email" {
+  description = "Email address for notifications (SNS, Budgets)"
+  type        = string
+  default     = "hhee445567@gmail.com"
+}
+
+variable "domain_name" {
+  description = "Domain name for Route53 (leave empty if not using custom domain)"
+  type        = string
+  default     = ""
+}
+
+variable "hosted_zone_id" {
+  description = "Route53 Hosted Zone ID (optional, will be looked up by domain_name if empty)"
+  type        = string
+  default     = ""
 }

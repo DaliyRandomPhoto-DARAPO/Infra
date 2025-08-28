@@ -1,50 +1,43 @@
-# 최신 Amazon Linux 2023 AMI
+# 최신 Amazon Linux 2023 AMI (arm64)
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["137112412989"] # Amazon
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["al2023-ami-*-arm64"]
   }
 }
 
 resource "aws_security_group" "app" {
   name        = "darapo-${var.env}-app-sg"
-  description = "App SG"
+  description = "Security group for Darapo application"
   vpc_id      = module.vpc.vpc_id
 
+  # SSH (운영 시 본인 IP로 제한 권장 - 보안 위험!)
   ingress {
-    description = "SSH"
+    description = "SSH - WARNING: Open to all IPs for development"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.ssh_ingress_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTP 추가 (Let's Encrypt 인증용)
+  # HTTP (Let's Encrypt 인증용)
   ingress {
-    description = "HTTP for Lets Encrypt"
+    description = "HTTP"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTPS 추가 (프로덕션 트래픽)
+  # HTTPS (프로덕션 트래픽)
   ingress {
-    description = "HTTPS for production"
+    description = "HTTPS"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Nest app port"
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # 데모용. 운영에선 ALB 뒤로 숨길 예정
   }
 
   egress {
@@ -54,20 +47,34 @@ resource "aws_security_group" "app" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
 # EC2 인스턴스 (퍼블릭 서브넷)
 resource "aws_instance" "app" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.instance_type
   subnet_id                   = module.vpc.public_subnets[0]
   vpc_security_group_ids      = [aws_security_group.app.id]
-  key_name                    = var.ssh_key_name
   associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
 
-  root_block_device {
-    volume_size = 40
+  credit_specification {
+    cpu_credits = "unlimited"
   }
 
+  root_block_device {
+    volume_type           = "gp3"
+    volume_size           = 40
+    delete_on_termination = true
+    iops                  = 3000
+    throughput            = 125
+  }
+
+  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+    env = var.env
+  }))
+
   tags = {
-    Name = "darapo-${var.env}-app"
+    Name    = "darapo-${var.env}-app"
+    Project = "darapo"
   }
 }
