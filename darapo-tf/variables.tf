@@ -36,3 +36,9 @@ variable "hosted_zone_id" {
   type        = string
   default     = ""
 }
+
+variable "key_name" {
+  description = "Name of the SSH key pair to use for EC2 instance"
+  type        = string
+  default     = "darapo-ec2-key"
+}

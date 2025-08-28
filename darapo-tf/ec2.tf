@@ -8,6 +8,12 @@ data "aws_ami" "al2023" {
   }
 }
 
+# SSH 키 페어
+resource "aws_key_pair" "this" {
+  key_name   = var.key_name
+  public_key = file(pathexpand("~/.ssh/darapo-ec2-key.pub"))
+}
+
 resource "aws_security_group" "app" {
   name        = "darapo-${var.env}-app-sg"
   description = "Security group for Darapo application"
@@ -52,6 +58,7 @@ resource "aws_security_group" "app" {
 resource "aws_instance" "app" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.instance_type
+  key_name                    = var.key_name
   subnet_id                   = module.vpc.public_subnets[0]
   vpc_security_group_ids      = [aws_security_group.app.id]
   associate_public_ip_address = true
