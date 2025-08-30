@@ -11,7 +11,7 @@ resource "aws_route53_record" "root" {
   name            = var.domain_name
   type            = "A"
   ttl             = "300"
-  records         = [aws_instance.app.public_ip]
+  records         = [aws_eip.app.public_ip]
   allow_overwrite = true
 }
 
@@ -22,6 +22,6 @@ resource "aws_route53_record" "api" {
   name            = "api.${var.domain_name}"
   type            = "A"
   ttl             = "300"
-  records         = [aws_instance.app.public_ip]
+  records         = [aws_eip.app.public_ip]
   allow_overwrite = true
 }

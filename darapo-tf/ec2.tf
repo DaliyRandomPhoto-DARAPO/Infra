@@ -14,6 +14,16 @@ resource "aws_key_pair" "this" {
   public_key = file(pathexpand("~/.ssh/darapo-ec2-key.pub"))
 }
 
+# 탄력적 IP (고정 IP 주소)
+resource "aws_eip" "app" {
+  instance = aws_instance.app.id
+  domain   = "vpc"
+
+  tags = {
+    Name = "darapo-${var.env}-eip"
+  }
+}
+
 resource "aws_security_group" "app" {
   name        = "darapo-${var.env}-app-sg"
   description = "Security group for Darapo application"

@@ -5,13 +5,18 @@ output "instance_id" {
 }
 
 output "public_ip" {
-  description = "EC2 Public IP"
+  description = "EC2 Public IP (변경될 수 있음)"
   value       = aws_instance.app.public_ip
 }
 
+output "elastic_ip" {
+  description = "Elastic IP (고정 IP 주소)"
+  value       = aws_eip.app.public_ip
+}
+
 output "application_url" {
-  description = "Application URL"
-  value       = "http://${aws_instance.app.public_ip}/"
+  description = "Application URL (Elastic IP 사용)"
+  value       = "http://${aws_eip.app.public_ip}/"
 }
 
 # MongoDB 연결 정보
